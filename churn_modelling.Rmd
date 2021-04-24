@@ -1,0 +1,60 @@
+---
+title: " Modelovanje ponašanja klijenata u banci"
+subtitle: "eng. Churn Modelling"
+author:
+  - Aleksandra Zdravković
+  - Ognjen Lazić
+  - Kosta Ljujić
+  - Mihajlo Srbakoski
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data <- read.csv("data.csv")
+head(data)
+```
+Kako smatramo da *RowNumber, CustomedId, Surname* nisu značajni prediktori, nećemo ih posmatrati u daljem radu.
+Kategorički prediktor *Geography* ćemo prebaciti u *dummy varijablu*, dok ćemo *Gender* kodirati binarno.
+
+```{r}
+# odbacujemo navedene kolone
+data <- data[, -which(names(data) %in% c("RowNumber", "CustomerId", "Surname"))]
+
+# kolona Geography u dummy
+data <- fastDummies::dummy_cols(data)
+
+# odbacujemo Geography_Spain i Gender_Male, kako su zavisne od ostalih, kao i 
+# Geography i Gender
+data <- data[, -which(names(data) %in% c("Geography_Spain", 
+                                         "Gender_Male",
+                                         "Geography",
+                                         "Gender"))]
+head(data)
+
+```
+
+```{r}
+exited <- data$Exited
+data <- data[, -which(names(data) %in% c("Exited"))]
+
+library(corrplot)
+corrplot(cor(data), method = "color")
+```
+
+```{r}
+index_train <- sample(nrow(data), 0.8 * nrow(data))
+train <- data[index_train, ]
+test <- data[-index_train, ]
+```
+
