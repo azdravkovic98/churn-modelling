@@ -58,6 +58,6 @@ train <- data[index_train, ]
 test <- data[-index_train, ]
 
 
-print("lao")
+print("lao gha ")
 ```
 
