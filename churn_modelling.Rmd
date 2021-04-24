@@ -56,5 +56,8 @@ corrplot(cor(data), method = "color")
 index_train <- sample(nrow(data), 0.8 * nrow(data))
 train <- data[index_train, ]
 test <- data[-index_train, ]
+
+
+print("lao")
 ```
 
