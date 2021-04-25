@@ -20,10 +20,150 @@ text-align: justify}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Uvod
+
+
+Banke i osiguravajuće kompanije često koriste analizu odliva kupaca (*eng. churn analysis*) i stope odliva klijenata kao jednu od svojih ključnih poslovnih pokazatelja, jer su troškovi zadržavanja postojećih kupaca daleko manji od sticanja novog.
+
+Ova analiza se fokusira na ponašanje bankarskih klijenata za koje je veća verovatnoća da će napustiti banku (tj. zatvoriti svoj bankovni račun). Cilj je otkrivanje najupečatljivijih ponašanja kupaca kroz istraživačku analizu podataka, kao i upotreba tehnika prediktivne analize kako bi se utvrdili kupci koji će najverovatnije napustiti banku.
+
+
+# Pretprocesiranje podataka (*eng. Data Preprocessing*)
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(patchwork)
+library(caret)
+library(vcd)
+library(gridExtra)
+library(knitr)
+library(corrplot)
+library(scales)
+library(lme4)
+library(InformationValue)
+library(ROCR)
+library(rpart)
+library(randomForest)
+library(xgboost)
+library(MASS)
+library(ggmosaic)
+library(e1071)
+library(ranger)
+library(penalized)
+library(rpart.plot)
+library(ggcorrplot)
+library(caTools)
+
+
+
+library(tibble)
+library(corrplot)
+library(ggplot2)
+library(keras)
+library(reticulate)
+# in case you run into error run this : reticulate::py_discover_config("keras") 
+use_python("C:/Users/azdra/anaconda3/envs/PythonCPU/python.exe")
+#use_python("<yourpath>/Anaconda3/envs/r-tensorflow/Scripts/python.exe")
+```
+
 ```{r}
 data <- read.csv("data.csv")
 head(data)
+glimpse(data)
 ```
+
+## NA vrednosti
+
+Proverava se da li postoje NA vrednosti:
+
+```{r}
+sapply(data, function(x) sum(is.na(x)))
+```
+
+Nema nedostajućih vrednosti.
+
+```{r}
+summary(data)
+```
+
+## Zavisna promenljiva
+
+```{r fig.height=4, fig.width=4}
+# pomoćni dataframe za koristi vizuelizacije
+df <- data.frame(Exited = c(0,1), 
+                 Frequency = c(sum(data$Exited == 0), y = c(sum(data$Exited == 1))))
+options(repr.plot.width = 10, repr.plot.height = 6)
+ggplot(df, aes(x = Exited, y = Frequency, fill = as.factor(Exited))) +
+      geom_bar(stat = "identity") +
+      theme_minimal() +
+      scale_fill_brewer(palette = "Dark2", labels = c("No", "Yes")) +
+      labs(fill = "Exited")
+```
+
+```{r}
+table(data$Exited)
+```
+
+Vidi se da većina korisnika nije napustila banku.
+
+## Raspodele prediktora
+
+
+Pogledajmo prvo raspodele neprekidnih prediktora.
+
+```{r message=FALSE, warning=FALSE}
+data[, which(names(data) %in% c("Age", 
+                                "Balance", 
+                                "CreditScore", 
+                                "CustomerId"))] %>%
+  keep(is.numeric) %>%
+  gather() %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = value, fill = key), color = "black") +
+  facet_wrap(~ key, scales = "free") +
+  theme_minimal() +
+  theme(legend.position = 'none')
+```
+Zaključujemo:
+
+* Raspodela prediktora *Age* je pomerena udesno.
+* Prediktor *Balance* je blizu normalno raspodeljen.
+* Većina predikotra *Credit score* je veća od 600. Moguće je da će baš ovi klijenti napustiti banku.
+
+
+Pogledajmo sada raspodele kategoričkih prediktora.
+
+```{r}
+data[, which(names(data) %in% c("Gender", 
+                                "Geography", 
+                                "HasCrCard", 
+                                "IsActiveMember", 
+                                "NumOfProducts", 
+                                "Tenure"))] %>%
+  gather() %>%
+  group_by(key, value) %>% 
+  summarize(n = n()) %>% 
+  ggplot() +
+  geom_bar(mapping=aes(x = n, y = value, fill=key), color="black", stat='identity') + 
+  coord_flip() +
+  facet_wrap(~ key, scales = "free") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2") +
+  theme(legend.position = 'none')
+
+```
+
+Zaključujemo:
+
+* Veći broj klijenata je muškog pola.
+* Klijenti su većinski iz Francuske.
+* Većina klijenata ima kreditnu karticu.
+* Broj aktivnih i neaktivnih članova je veoma sličan.
+* Većina klijenata koristi 1 do 2 proizvoda banke, dok jako malo klijenata koristi 3 i 4 proizvoda.
+* Broj klijenata koji su članovi banke $1, 2, ..., 9$ godina je približno isti.
+
+## Čišćenje podataka (*eng. Data Cleaning*)
+
 Kako smatramo da *RowNumber, CustomedId, Surname* nisu značajni prediktori, nećemo ih posmatrati u daljem radu.
 Kategorički prediktor *Geography* ćemo prebaciti u *dummy varijablu*, dok ćemo *Gender* kodirati binarno.
 
@@ -40,24 +180,20 @@ data <- data[, -which(names(data) %in% c("Geography_Spain",
                                          "Gender_Male",
                                          "Geography",
                                          "Gender"))]
-head(data)
-
 ```
+
+## Korelacija
 
 ```{r}
-exited <- data$Exited
-data <- data[, -which(names(data) %in% c("Exited"))]
-
-library(corrplot)
 corrplot(cor(data), method = "color")
 ```
+
+
+# Kreiranje modela
 
 ```{r}
 index_train <- sample(nrow(data), 0.8 * nrow(data))
 train <- data[index_train, ]
 test <- data[-index_train, ]
-
-
-print("lao gha ")
 ```
 
