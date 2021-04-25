@@ -88,7 +88,7 @@ summary(data)
 
 ## Zavisna promenljiva
 
-```{r fig.height=4, fig.width=4}
+```{r echo=FALSE, fig.height=4, fig.width=4}
 # pomoćni dataframe za koristi vizuelizacije
 df <- data.frame(Exited = c(0,1), 
                  Frequency = c(sum(data$Exited == 0), y = c(sum(data$Exited == 1))))
@@ -106,12 +106,11 @@ table(data$Exited)
 
 Vidi se da većina korisnika nije napustila banku.
 
-## Raspodele prediktora
-
+## Analiza prediktora
 
 Pogledajmo prvo raspodele neprekidnih prediktora.
 
-```{r message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 data[, which(names(data) %in% c("Age", 
                                 "Balance", 
                                 "CreditScore", 
@@ -133,7 +132,7 @@ Zaključujemo:
 
 Pogledajmo sada raspodele kategoričkih prediktora.
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 data[, which(names(data) %in% c("Gender", 
                                 "Geography", 
                                 "HasCrCard", 
@@ -162,6 +161,152 @@ Zaključujemo:
 * Većina klijenata koristi 1 do 2 proizvoda banke, dok jako malo klijenata koristi 3 i 4 proizvoda.
 * Broj klijenata koji su članovi banke $1, 2, ..., 9$ godina je približno isti.
 
+
+
+### Prediktor *Age*
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df <- data %>% 
+      dplyr::select(-RowNumber, -CustomerId, -Surname) %>% #remove unwanted column 
+      mutate(Geography = as.factor(Geography),
+             Gender = as.factor(Gender),
+             HasCrCard = as.factor(HasCrCard),
+             IsActiveMember = as.factor(IsActiveMember),
+             Exited = as.factor(Exited),
+             Tenure = as.factor(Tenure),
+             NumOfProducts = as.factor(NumOfProducts))
+
+hist <- ggplot(df, aes(x = Age, fill = Exited)) +
+              geom_histogram(binwidth = 5) +
+              theme_minimal() +
+              scale_fill_brewer(palette = "Dark2") +
+              scale_x_continuous(breaks = seq(0, 100, by = 10), labels = comma)
+boxplot <- ggplot(df, aes(x = Exited, y = Age, fill = Exited)) +
+               geom_boxplot() + 
+               theme_minimal() +
+               scale_fill_brewer(palette = "Dark2") +
+               theme(legend.position = 'none')
+
+hist | boxplot
+```
+
+Zaključujemo:
+
+* Klijenti koji su ostali u banci imaju tendenciju da budu mlađi.
+* Veliki broj kllijenata koji su napustili banku ima između 40 i 50 godina.
+* Klijenti starosti između 60 i 80 godina imaju tendenciju da ne napuštaju banku.
+
+### Prediktor *Balance*
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+hist <- ggplot(df, aes(x = Balance, fill = Exited)) +
+            geom_histogram() +
+            theme_minimal() +
+            scale_fill_brewer(palette = "Dark2") +
+            theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+            scale_x_continuous(breaks = seq(0, 255000, by = 40000), labels = comma)
+boxplot <- ggplot(df, aes(x = Exited, y = Balance, fill = Exited)) +
+               geom_boxplot() + 
+               theme_minimal() +
+               scale_fill_brewer(palette = "Dark2") +
+               theme(legend.position = 'none')
+
+hist | boxplot
+```
+
+Zaključujemo:
+
+* Klijenti koji ostaju u banci imaju manje sredstava na računu od onih koji napuštaju banku.
+
+
+### Prediktor *Estimated Salary*
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+hist <- ggplot(df, aes(x = EstimatedSalary, fill = Exited)) +
+            geom_histogram() +
+            theme_minimal() +
+            scale_fill_brewer(palette = "Dark2") +
+            theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+boxplot <- ggplot(df, aes(x = Exited, y = EstimatedSalary, fill = Exited)) +
+               geom_boxplot() + 
+               theme_minimal() +
+               scale_fill_brewer(palette = "Dark2") +
+               theme(legend.position = 'none')
+
+hist | boxplot
+```
+
+Zaključujemo:
+
+* Ne postoji vidna razlika u zaradi između klijenata koji napuštaju/ne napuštaju banku.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+gender_graph <- df %>%
+  dplyr::select(Gender, Exited) %>% 
+  table(.) %>% 
+  as.data.frame() %>% 
+  ggplot(.) +
+  ggmosaic::geom_mosaic(aes(weight = Freq, x = product(Gender), fill = Exited)) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = 'Gender')
+
+geography_graph <- df %>%
+  dplyr::select(Geography, Exited) %>% 
+  table(.) %>% 
+  as.data.frame() %>% 
+  ggplot(.) +
+  ggmosaic::geom_mosaic(aes(weight = Freq, x = product(Geography), fill = Exited)) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = 'Geography')
+
+tenure_graph <- df %>%
+  dplyr::select(Tenure, Exited) %>% 
+  table(.) %>% 
+  as.data.frame() %>% 
+  ggplot(.) +
+  ggmosaic::geom_mosaic(aes(weight = Freq, x = product(Tenure), fill = Exited)) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = 'Tenure')
+
+HasCrCard_graph <- df %>%
+  dplyr::select(HasCrCard, Exited) %>% 
+  table(.) %>% 
+  as.data.frame() %>% 
+  ggplot(.) +
+  ggmosaic::geom_mosaic(aes(weight = Freq, x = product(HasCrCard), fill = Exited)) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = 'HasCrCard')
+
+IsActiveMember_graph <- df %>%
+  dplyr::select(IsActiveMember, Exited) %>% 
+  table(.) %>% 
+  as.data.frame() %>% 
+  ggplot(.) +
+  ggmosaic::geom_mosaic(aes(weight = Freq, x = product(IsActiveMember), fill = Exited)) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = 'IsActiveMember')
+
+NumOfProducts_graph <- df %>%
+  dplyr::select(NumOfProducts, Exited) %>% 
+  table(.) %>% 
+  as.data.frame() %>% 
+  ggplot(.) +
+  ggmosaic::geom_mosaic(aes(weight = Freq, x = product(NumOfProducts), fill = Exited)) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = 'NumOfProducts')
+  
+
+(gender_graph | geography_graph) / (IsActiveMember_graph | HasCrCard_graph ) / (tenure_graph | NumOfProducts_graph)
+```
+
+
 ## Čišćenje podataka (*eng. Data Cleaning*)
 
 Kako smatramo da *RowNumber, CustomedId, Surname* nisu značajni prediktori, nećemo ih posmatrati u daljem radu.
@@ -181,6 +326,7 @@ data <- data[, -which(names(data) %in% c("Geography_Spain",
                                          "Geography",
                                          "Gender"))]
 ```
+
 
 ## Korelacija
 
