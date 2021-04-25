@@ -53,6 +53,8 @@ library(penalized)
 library(rpart.plot)
 library(ggcorrplot)
 library(caTools)
+library(RColorBrewer)
+
 
 
 
@@ -88,7 +90,7 @@ summary(data)
 
 ## Zavisna promenljiva
 
-```{r echo=FALSE, fig.height=4, fig.width=4}
+```{r echo=FALSE, fig.height=3, fig.width=6}
 # pomoćni dataframe za koristi vizuelizacije
 df <- data.frame(Exited = c(0,1), 
                  Frequency = c(sum(data$Exited == 0), y = c(sum(data$Exited == 1))))
@@ -110,7 +112,7 @@ Vidi se da većina korisnika nije napustila banku.
 
 Pogledajmo prvo raspodele neprekidnih prediktora.
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
 data[, which(names(data) %in% c("Age", 
                                 "Balance", 
                                 "CreditScore", 
@@ -132,7 +134,7 @@ Zaključujemo:
 
 Pogledajmo sada raspodele kategoričkih prediktora.
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
 data[, which(names(data) %in% c("Gender", 
                                 "Geography", 
                                 "HasCrCard", 
@@ -165,7 +167,7 @@ Zaključujemo:
 
 ### Prediktor *Age*
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
 df <- data %>% 
       dplyr::select(-RowNumber, -CustomerId, -Surname) %>% #remove unwanted column 
       mutate(Geography = as.factor(Geography),
@@ -198,7 +200,7 @@ Zaključujemo:
 
 ### Prediktor *Balance*
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
 hist <- ggplot(df, aes(x = Balance, fill = Exited)) +
             geom_histogram() +
             theme_minimal() +
@@ -212,6 +214,16 @@ boxplot <- ggplot(df, aes(x = Exited, y = Balance, fill = Exited)) +
                theme(legend.position = 'none')
 
 hist | boxplot
+
+exp6 <- ggplot(df, aes(Balance, fill = Exited)) + 
+        geom_density(alpha = 0.7) + 
+        theme_minimal() +
+        scale_fill_brewer(palette = "Dark2") +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+
+grid.arrange(exp6, boxplot, ncol = 2, nrow = 1)
+
 ```
 
 Zaključujemo:
@@ -221,7 +233,7 @@ Zaključujemo:
 
 ### Prediktor *Estimated Salary*
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
 hist <- ggplot(df, aes(x = EstimatedSalary, fill = Exited)) +
             geom_histogram() +
             theme_minimal() +
@@ -234,6 +246,16 @@ boxplot <- ggplot(df, aes(x = Exited, y = EstimatedSalary, fill = Exited)) +
                theme(legend.position = 'none')
 
 hist | boxplot
+
+
+exp6 <- ggplot(df, aes(EstimatedSalary, fill = Exited)) + 
+        geom_density(alpha = 0.7) + 
+        theme_minimal() +
+        scale_fill_brewer(palette = "Dark2") +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+
+grid.arrange(exp6, boxplot, ncol = 2, nrow = 1)
 ```
 
 Zaključujemo:
@@ -241,7 +263,7 @@ Zaključujemo:
 * Ne postoji vidna razlika u zaradi između klijenata koji napuštaju/ne napuštaju banku.
 
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3, fig.width=6}
 gender_graph <- df %>%
   dplyr::select(Gender, Exited) %>% 
   table(.) %>% 
@@ -332,6 +354,8 @@ data <- data[, -which(names(data) %in% c("Geography_Spain",
 
 ```{r}
 corrplot(cor(data), method = "color")
+corrplot(cor(data), order = "hclust",
+         col = brewer.pal(n = 8, name = "PuOr"))
 ```
 
 
