@@ -56,8 +56,7 @@ library(caTools)
 library(RColorBrewer)
 
 
-
-
+library(readr) # read_csv
 library(tibble)
 library(corrplot)
 library(ggplot2)
@@ -68,10 +67,34 @@ use_python("C:/Users/azdra/anaconda3/envs/PythonCPU/python.exe")
 #use_python("<yourpath>/Anaconda3/envs/r-tensorflow/Scripts/python.exe")
 ```
 
-```{r}
-data <- read.csv("data.csv")
+```{r message=FALSE, warning=FALSE}
+data <- read_csv("~/Faks/EFM/churn_modelling/data_with_NA.csv")
+data <- as.data.frame(data)
 head(data)
+
 glimpse(data)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(kableExtra)
+library(glue)
+
+table <- rbind(c("RowNumber", "Redni broj reda (od 1 do 10 000)"), 
+               c("CustomerId", "Jedinstveni identifikacioni broj klijenta banke"),
+               c("Surname", "Prezime klijenta"), 
+               c("CreditScore", "Kreditni skor klijenta"), 
+               c("Geography", "Zemlja porekla klijenta"), 
+               c("Gender", "Pol klijenta (muško ili žensko)"), 
+               c("Age", "Godine klijenta"), 
+               c("Tenure", "Broj godina koliko je dugo klijent u banci"), 
+               c("Balance", "Stanje na računu"), 
+               c("NumOfProducts", "Broj proizvoda banke koje klijent koristi"),
+               c("HasCrCard", "Indikator da li klijent poseduje kreditnu karticu banke"),
+               c("IsActiveMember", "Indikator da li je klijent aktivan u banci"),
+               c("EstimatedSalary", "Procenjena plata klijenta (u dolarima)"),
+               c("Exited","Indikator da li je klijent napustio banku"))
+kbl(table, booktabs = T) %>%
+  kable_styling(latex_options = "striped")
 ```
 
 ## NA vrednosti
@@ -79,13 +102,40 @@ glimpse(data)
 Proverava se da li postoje NA vrednosti:
 
 ```{r}
-sapply(data, function(x) sum(is.na(x)))
+sapply(data, function(x) mean(is.na(x)))
 ```
 
-Nema nedostajućih vrednosti.
+Dakle, u sledećim kolonama se pojavljuju NA vrednosti:
 
-```{r}
-summary(data)
+* *CreditScore*
+* *Balance*
+* *NumOfProducts*
+* *HasCrCard*
+* *IsActiveMember*
+* *EstimatedSalary*
+
+
+## Imputacija podataka. Algoritam *miss forest*
+
+*Miss forest* je algoritam koji uz pomoć algoritma slučajna šuma (*eng. random forest*) imputira nedostajuće podatke.
+
+Inicijalno, nedostajući podaci se dopunjavaju koristeći srednju vrednost/modu obeležja, a zatim se za svaku kolonu sa vrednostima koje nedostaju kreira model algoritmom *random forest* koji predviđa nedostajuću vrednost na osnovu ostalih. Ovaj proces se ponavlja dok se ne dostigne maksimalan broj iteracija.
+
+Iskoristimo ovaj algoritam u imputaciji datih podataka.
+
+```{r message=FALSE, warning=FALSE}
+# kategoričke prediktore transformišemo u tip factor
+# kako se u ne bi desilo da se kod njih pojave decimalne vrednosti
+# nakon što algoritam dodeli npr. srednje vrednosti na nedostajućim
+# mestima
+data[, c(10, 11, 12)] <- lapply(data[, c(10, 11, 12)], as.factor)
+
+data.imp <- missForest::missForest(data[, c(4, 9, 10, 11, 12, 13)], maxiter = 10)
+data[, c(4, 9, 10, 11, 12, 13)] <- data.imp$ximp
+
+# proveravamo da li je sada procenat NA vrednosti 0%
+sapply(data, function(x) mean(is.na(x)))
+
 ```
 
 ## Zavisna promenljiva
