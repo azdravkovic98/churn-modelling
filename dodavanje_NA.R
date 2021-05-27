@@ -13,4 +13,4 @@ for(i in 1:length(data)){
   print(mean(is.na(data[, i])))
 }
 
-write.csv(data, "C:/Users/azdra/Documents/Faks/EFM/churn_modelling//data_with_NA.csv", row.names = FALSE)
+write.csv(data, "C:/Users/azdra/Documents/Faks/EFM/churn-modelling//data_with_NA.csv", row.names = FALSE)

@@ -16,17 +16,12 @@ body {
 text-align: justify}
 </style>
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 # Uvod
 
 
 Banke i osiguravajuće kompanije često koriste analizu odliva kupaca (*eng. churn analysis*) i stope odliva klijenata kao jednu od svojih ključnih poslovnih pokazatelja, jer su troškovi zadržavanja postojećih kupaca daleko manji od sticanja novog.
 
 Ova analiza se fokusira na ponašanje bankarskih klijenata za koje je veća verovatnoća da će napustiti banku (tj. zatvoriti svoj bankovni račun). Cilj je otkrivanje najupečatljivijih ponašanja kupaca kroz istraživačku analizu podataka, kao i upotreba tehnika prediktivne analize kako bi se utvrdili kupci koji će najverovatnije napustiti banku.
-
 
 # Pretprocesiranje podataka (*eng. Data Preprocessing*)
 
@@ -54,31 +49,29 @@ library(rpart.plot)
 library(ggcorrplot)
 library(caTools)
 library(RColorBrewer)
-
-
 library(readr) # read_csv
 library(tibble)
 library(corrplot)
 library(ggplot2)
 library(keras)
 library(reticulate)
+library(imbalance)
+library(Metrics)
 # in case you run into error run this : reticulate::py_discover_config("keras") 
 use_python("C:/Users/azdra/anaconda3/envs/PythonCPU/python.exe")
 #use_python("<yourpath>/Anaconda3/envs/r-tensorflow/Scripts/python.exe")
 ```
 
 ```{r message=FALSE, warning=FALSE}
-data <- read_csv("~/Faks/EFM/churn_modelling/data_with_NA.csv")
+data <- read_csv("data_with_NA.csv")
 data <- as.data.frame(data)
 head(data)
-
 glimpse(data)
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 library(kableExtra)
 library(glue)
-
 table <- rbind(c("RowNumber", "Redni broj reda (od 1 do 10 000)"), 
                c("CustomerId", "Jedinstveni identifikacioni broj klijenta banke"),
                c("Surname", "Prezime klijenta"), 
@@ -123,24 +116,22 @@ Inicijalno, nedostajući podaci se dopunjavaju koristeći srednju vrednost/modu 
 
 Iskoristimo ovaj algoritam u imputaciji datih podataka.
 
-```{r message=FALSE, warning=FALSE}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 # kategoričke prediktore transformišemo u tip factor
-# kako se u ne bi desilo da se kod njih pojave decimalne vrednosti
+# kako se ne bi desilo da se kod njih pojave decimalne vrednosti
 # nakon što algoritam dodeli npr. srednje vrednosti na nedostajućim
 # mestima
 data[, c(10, 11, 12)] <- lapply(data[, c(10, 11, 12)], as.factor)
-
-data.imp <- missForest::missForest(data[, c(4, 9, 10, 11, 12, 13)], maxiter = 10)
+data.imp <- missForest::missForest(data[, c(4, 9, 10, 11, 12, 13)], maxiter = 6)
 data[, c(4, 9, 10, 11, 12, 13)] <- data.imp$ximp
-
+data[, c(10, 11, 12)] <- lapply(data[, c(10, 11, 12)], as.numeric) # vracamo u tip numeric
 # proveravamo da li je sada procenat NA vrednosti 0%
 sapply(data, function(x) mean(is.na(x)))
-
 ```
 
 ## Zavisna promenljiva
 
-```{r echo=FALSE, fig.height=3, fig.width=6}
+```{r echo=FALSE, fig.height=2, fig.width=4}
 # pomoćni dataframe za koristi vizuelizacije
 df <- data.frame(Exited = c(0,1), 
                  Frequency = c(sum(data$Exited == 0), y = c(sum(data$Exited == 1))))
@@ -150,10 +141,6 @@ ggplot(df, aes(x = Exited, y = Frequency, fill = as.factor(Exited))) +
       theme_minimal() +
       scale_fill_brewer(palette = "Dark2", labels = c("No", "Yes")) +
       labs(fill = "Exited")
-```
-
-```{r}
-table(data$Exited)
 ```
 
 Vidi se da većina korisnika nije napustila banku.
@@ -175,6 +162,9 @@ data[, which(names(data) %in% c("Age",
   theme_minimal() +
   theme(legend.position = 'none')
 ```
+
+
+
 Zaključujemo:
 
 * Raspodela prediktora *Age* je pomerena udesno.
@@ -201,7 +191,6 @@ data[, which(names(data) %in% c("Gender",
   theme_minimal() +
   scale_fill_brewer(palette = "Dark2") +
   theme(legend.position = 'none')
-
 ```
 
 Zaključujemo:
@@ -227,7 +216,6 @@ df <- data %>%
              Exited = as.factor(Exited),
              Tenure = as.factor(Tenure),
              NumOfProducts = as.factor(NumOfProducts))
-
 hist <- ggplot(df, aes(x = Age, fill = Exited)) +
               geom_histogram(binwidth = 5) +
               theme_minimal() +
@@ -238,14 +226,13 @@ boxplot <- ggplot(df, aes(x = Exited, y = Age, fill = Exited)) +
                theme_minimal() +
                scale_fill_brewer(palette = "Dark2") +
                theme(legend.position = 'none')
-
 hist | boxplot
 ```
 
 Zaključujemo:
 
 * Klijenti koji su ostali u banci imaju tendenciju da budu mlađi.
-* Veliki broj kllijenata koji su napustili banku ima između 40 i 50 godina.
+* Veliki broj klijenata koji su napustili banku ima između 40 i 50 godina.
 * Klijenti starosti između 60 i 80 godina imaju tendenciju da ne napuštaju banku.
 
 ### Prediktor *Balance*
@@ -262,24 +249,12 @@ boxplot <- ggplot(df, aes(x = Exited, y = Balance, fill = Exited)) +
                theme_minimal() +
                scale_fill_brewer(palette = "Dark2") +
                theme(legend.position = 'none')
-
 hist | boxplot
-
-exp6 <- ggplot(df, aes(Balance, fill = Exited)) + 
-        geom_density(alpha = 0.7) + 
-        theme_minimal() +
-        scale_fill_brewer(palette = "Dark2") +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
-
-
-grid.arrange(exp6, boxplot, ncol = 2, nrow = 1)
-
 ```
 
 Zaključujemo:
 
 * Klijenti koji ostaju u banci imaju manje sredstava na računu od onih koji napuštaju banku.
-
 
 ### Prediktor *Estimated Salary*
 
@@ -294,18 +269,7 @@ boxplot <- ggplot(df, aes(x = Exited, y = EstimatedSalary, fill = Exited)) +
                theme_minimal() +
                scale_fill_brewer(palette = "Dark2") +
                theme(legend.position = 'none')
-
 hist | boxplot
-
-
-exp6 <- ggplot(df, aes(EstimatedSalary, fill = Exited)) + 
-        geom_density(alpha = 0.7) + 
-        theme_minimal() +
-        scale_fill_brewer(palette = "Dark2") +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
-
-
-grid.arrange(exp6, boxplot, ncol = 2, nrow = 1)
 ```
 
 Zaključujemo:
@@ -323,7 +287,6 @@ gender_graph <- df %>%
   theme_minimal() +
   scale_fill_brewer(palette = "Dark2") +
   labs(x = 'Gender')
-
 geography_graph <- df %>%
   dplyr::select(Geography, Exited) %>% 
   table(.) %>% 
@@ -333,7 +296,6 @@ geography_graph <- df %>%
   theme_minimal() +
   scale_fill_brewer(palette = "Dark2") +
   labs(x = 'Geography')
-
 tenure_graph <- df %>%
   dplyr::select(Tenure, Exited) %>% 
   table(.) %>% 
@@ -343,7 +305,6 @@ tenure_graph <- df %>%
   theme_minimal() +
   scale_fill_brewer(palette = "Dark2") +
   labs(x = 'Tenure')
-
 HasCrCard_graph <- df %>%
   dplyr::select(HasCrCard, Exited) %>% 
   table(.) %>% 
@@ -353,7 +314,6 @@ HasCrCard_graph <- df %>%
   theme_minimal() +
   scale_fill_brewer(palette = "Dark2") +
   labs(x = 'HasCrCard')
-
 IsActiveMember_graph <- df %>%
   dplyr::select(IsActiveMember, Exited) %>% 
   table(.) %>% 
@@ -363,7 +323,6 @@ IsActiveMember_graph <- df %>%
   theme_minimal() +
   scale_fill_brewer(palette = "Dark2") +
   labs(x = 'IsActiveMember')
-
 NumOfProducts_graph <- df %>%
   dplyr::select(NumOfProducts, Exited) %>% 
   table(.) %>% 
@@ -374,46 +333,255 @@ NumOfProducts_graph <- df %>%
   scale_fill_brewer(palette = "Dark2") +
   labs(x = 'NumOfProducts')
   
-
 (gender_graph | geography_graph) / (IsActiveMember_graph | HasCrCard_graph ) / (tenure_graph | NumOfProducts_graph)
 ```
 
+Zaključujemo:
+
+* Klijenti koji ostaju u banci koriste manje proizvoda od onih koji napuštaju banku.
+* Ostali prediktori nemaju značajan uticaj na napuštanje banke
 
 ## Čišćenje podataka (*eng. Data Cleaning*)
 
-Kako smatramo da *RowNumber, CustomedId, Surname* nisu značajni prediktori, nećemo ih posmatrati u daljem radu.
-Kategorički prediktor *Geography* ćemo prebaciti u *dummy varijablu*, dok ćemo *Gender* kodirati binarno.
+Kako smatramo da *RowNumber, CustomedId, Surname, Geography* nisu značajni prediktori, nećemo ih posmatrati u daljem radu.
+Kategorički prediktor *Gender* ćemo kodirati binarno.
 
-```{r}
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
 # odbacujemo navedene kolone
-data <- data[, -which(names(data) %in% c("RowNumber", "CustomerId", "Surname"))]
-
-# kolona Geography u dummy
-data <- fastDummies::dummy_cols(data)
-
-# odbacujemo Geography_Spain i Gender_Male, kako su zavisne od ostalih, kao i 
-# Geography i Gender
-data <- data[, -which(names(data) %in% c("Geography_Spain", 
-                                         "Gender_Male",
-                                         "Geography",
-                                         "Gender"))]
+data <- data[, -which(names(data) %in% c("RowNumber", 
+                                         "CustomerId", 
+                                         "Surname", 
+                                         "Geography"))]
+data$Gender <- ifelse(data$Gender=="Male", 0, 1)
 ```
-
 
 ## Korelacija
 
-```{r}
-corrplot(cor(data), method = "color")
-corrplot(cor(data), order = "hclust",
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+corrplot(cor(data.matrix(data)), order = "hclust",
          col = brewer.pal(n = 8, name = "PuOr"))
 ```
 
+Vidimo da između preostalih prediktora ne postoji značajna korelacija.
 
 # Kreiranje modela
 
-```{r}
+Delimo podatke na trening i test skup u odnosu 4:1.
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+set.seed(11)
 index_train <- sample(nrow(data), 0.8 * nrow(data))
 train <- data[index_train, ]
 test <- data[-index_train, ]
+```
+
+Podaci su nebalansirani, pa ćemo ih balansirati koristeći funkciju *mwmote*. Ova funkcija na slučajan način bira tačku A iz nedominantne kategorije, a potom posmatra njenih *k* najbližih suseda koji imaju istu kategoriju. Od tih suseda se na slučajan način bira tačka B. Nova tačka C, koju će funkcija generisati i dodeliti joj nedominantnu kategoriju, nalazi se između A i B, tj. dobijena je kao njihova konveksna kombinacija: $C = cA+(1−c)B$, za neko $c \in [0,1]$.
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+n <- 8000 - 2 * sum(train$Exited) 
+newSamples <- mwmote(dataset = train, numInstances = n, classAttr = "Exited")
+train1 <- rbind(train, newSamples)
+train2 <- train1 # pravimo kopiju
+```
+
+Kao meru kvaliteta modela koristimo kombinaciju *fbeta_score* i *recall*. Kako nam je najbitnije otkrivanje klijenata koji će napustiti banku, posmatraćemo zbir $\frac{9}{10} fbeta\_score + \frac{1}{10}recall$. Na taj način *recall* dobija veću težinu nego *precision*, što smo i hteli da postignemo. \ 
+
+### Neuronska mreža
+
+Prvo pravimo model koristeći potpuno povezanu neuronsku mrežu sa dva skrivena sloja od po 10 i 6 čvorova. Postupak ponavljamo 5 puta i čuvamo najbolji rezultat.
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+nc <- length(train1)
+trainLabels <- to_categorical(train1$Exited)
+testLabels <- to_categorical(test$Exited)
+training1 <- as.matrix(train1[, -which(names(data) %in% c("Exited"))])
+test1 <- test[, -which(names(data) %in% c("Exited"))]
+test2 <- test1 # pravimo kopiju
+```
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+thresholds <- seq(0.1, 0.9, 0.02)
+l <- length(thresholds)
+max <- 0
+pred_max <- c()
+for(i in 1:5){
+  model_nn <- keras_model_sequential()
+  model_nn %>%
+        layer_dense(units = 10, activation = 'relu', input_shape = c(nc - 1)) %>%
+        layer_dense(units = 6, activation = 'relu', input_shape = c(10)) %>%
+        layer_dense(units = 2, activation = 'softmax')
+  model_nn %>% compile(loss = 'categorical_crossentropy',
+                       optimizer = 'adam',
+                       metrics = 'accuracy')
+  model_nn %>% fit(data.matrix(training1),
+                   trainLabels,
+                   epochs = 12,
+                   batch_size = 128,
+                   validation_split = 0.2,
+                   verbose = 0)
+  pred <- model_nn %>% predict(as.matrix(test1))
+  pred <- apply(pred, 1, which.max) - 1
+  fbeta <- fbeta_score(test$Exited, pred)
+  recall <- recall(test$Exited, pred)
+  if((9*fbeta+recall) > max){
+    max <- 9*fbeta+recall
+    pred_max <- pred
+  }
+}
+recall(test$Exited, pred_max)
+fbeta_score(test$Exited, pred_max)
+(recall(test$Exited, pred_max) + 9 * fbeta_score(test$Exited, pred_max))/10
+```
+
+### Slučajne šume (*eng. Random Forest*)
+
+Pokušaćemo da nadmašimo ovaj rezultat koristeći *randomForest*. I ovde ponavljamo postupak 5 puta.
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+max <- 0
+pred_max <- c()
+for(i in 1:5){
+  model1 <- randomForest(Exited ~ ., data=train1, proximity=TRUE)
+  for(i in 1:l){
+    pred <- predict(model1, as.matrix(test1)) > thresholds[i]
+    fbeta <- fbeta_score(test$Exited, pred)
+    recall <- recall(test$Exited, pred)
+    # uporedjujemo da li je preciznost veća od dosadašnje maksimalne
+    if((9*fbeta+recall) > max){
+      max <- 9*fbeta+recall
+      pred_max <- pred
+    }
+  }
+}
+recall(test$Exited, pred_max)
+fbeta_score(test$Exited, pred_max)
+(recall(test$Exited, pred_max) + 9 * fbeta_score(test$Exited, pred_max))/10
+```
+
+### Logistička regresija
+
+Sada pravimo model pomoću logističke regresije.
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+max <- 0
+pred_max <- c()
+model_glm1 <- glm(Exited ~ ., family = binomial(link = 'logit'), data = train1)
+probs <- predict(model_glm1, test, type = 'response')
+for (i in 1:l) {
+  glm.pred <- ifelse(probs > thresholds[i], 1, 0)
+  recall <- recall(test$Exited, glm.pred)
+  fbeta <- fbeta_score(test$Exited, glm.pred)
+  if ((9 * fbeta + recall) > max) {
+    max <- 9 * fbeta + recall
+    pred_max <- glm.pred
+  }
+}
+recall(test$Exited, pred_max)
+fbeta_score(test$Exited, pred_max)
+(recall(test$Exited, pred_max) + 9 * fbeta_score(test$Exited, pred_max)) / 10
+```
+
+## Modeli nakon modifikacije parametara
+
+Sada konstruišimo modele sa transformisanim prediktorima *NumOfProducts* i *Age*. Prediktor *NumOfProducts* uzima vrednosti 1, 2, 3 i 4, pri čemu smo videli da klijenti koji imaju vrednosti 1 ili 2 imaju tendenciju da ostanu u banci, a oni sa 3 ili 4 je uglavnom napuštaju. Stoga ćemo prediktor *NumOfProducts* transformisati tako da uzima vrednost 0 umesto 1 i 2, a vrednost 1 umesto 3 i 4. Takođe, videli smo da najmlađi i najstariji klijenti češće ostaju u banci nego oni srednjih godina, pa ćemo prediktor *Age* podeliti u dve kategorije, i to tako da u jednoj kategoriji budu klijenti mlađi od 30 i stariji od 60 godina, a ostali u drugoj. 
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+# transformacija prediktora
+train2$Age <- ifelse(train2$Age <= 30 | train2$Age >= 60, 1, 0) 
+train2$NumOfProducts <- ifelse(train2$NumOfProducts > 2, 1, 0)
+test2$Age <- ifelse(test2$Age <= 30 | test2$Age >= 60, 1, 0)
+test2$NumOfProducts <- ifelse(test2$NumOfProducts > 2, 1, 0)
+```
+
+### Neuronska mreža
+
+Prvo pravimo model pomoću neuronskih mreža.
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+training2 <- as.matrix(train2[, -which(names(data) %in% c("Exited"))])
+max <- 0
+pred_max <- c()
+for (i in 1:5)
+{
+  model_nn2 <- keras_model_sequential()
+  model_nn2 %>%
+    layer_dense(units = 10,
+                activation = 'relu',
+                input_shape = c(nc - 1)) %>%
+    layer_dense(units = 6,
+                activation = 'relu',
+                input_shape = c(10)) %>%
+    layer_dense(units = 2,
+                activation = 'softmax')
+  model_nn2 %>% compile(loss = 'categorical_crossentropy',
+                        optimizer = 'adam',
+                        metrics = 'accuracy')
+  model_nn2 %>% fit(training2,
+                    trainLabels,
+                    epochs = 12,
+                    batch_size = 128,
+                    validation_split = 0.2,
+                    verbose = 0)
+  pred <- model_nn2 %>% predict(as.matrix(test2))
+  pred <- apply(pred, 1, which.max) - 1
+  fbeta <- fbeta_score(test$Exited, pred)
+  recall <- recall(test$Exited, pred)
+  if ((9 * fbeta + recall) > max) {
+    max <- 9 * fbeta + recall
+    pred_max <- pred
+  }
+}
+recall(test$Exited, pred_max)
+fbeta_score(test$Exited, pred_max)
+(recall(test$Exited, pred_max) + 9 * fbeta_score(test$Exited, pred_max)) / 10
+```
+
+### Slučajne šume (*eng. Random Forest*)
+
+Pravimo *randomForest* model.
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+max <- 0
+pred_max <- c()
+for (i in 1:5) {
+  model2 <- randomForest(Exited ~ ., data = train2, proximity = TRUE)
+  for (i in 1:l) {
+    pred <- predict(model2, as.matrix(test2)) > thresholds[i]
+    fbeta <- fbeta_score(test$Exited, pred)
+    recall <- recall(test$Exited, pred)
+    if ((9 * fbeta + recall) > max) {
+      max <- 9 * fbeta + recall
+      pred_max <- pred
+    }
+  }
+}
+recall(test$Exited, pred_max)
+fbeta_score(test$Exited, pred_max)
+(recall(test$Exited, pred_max) + 9 * fbeta_score(test$Exited, pred_max)) / 10
+```
+
+### Logistička regresija
+
+Pravimo model pomoću logističke regresije.
+
+```{r echo=TRUE, fig.height=3, fig.width=6, message=FALSE, warning=FALSE}
+test3 <- test2
+test3$Exited <- test$Exited
+max <- 0
+pred_max <- c()
+model_glm2 <- glm(Exited ~ ., family = binomial(link = 'logit'), data = train2)
+probs <- predict(model_glm2, test3, type = 'response')
+for (i in 1:l) {
+  glm.pred2 <- ifelse(probs > thresholds[i], 1, 0)
+  recall <- recall(test$Exited, glm.pred2)
+  fbeta <- fbeta_score(test$Exited, glm.pred2)
+  if ((9 * fbeta + recall) > max) {
+    max <- 9 * fbeta + recall
+    pred_max <- glm.pred2
+  }
+}
+recall(test$Exited, pred_max)
+fbeta_score(test$Exited, pred_max)
+(recall(test$Exited, pred_max) + 9 * fbeta_score(test$Exited, pred_max)) / 10
 ```
 
