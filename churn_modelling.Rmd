@@ -373,6 +373,7 @@ set.seed(11)
 index_train <- sample(nrow(data), 0.8 * nrow(data))
 train <- data[index_train, ]
 test <- data[-index_train, ]
+print("hami")
 ```
 
 Podaci su nebalansirani, pa ćemo ih balansirati koristeći funkciju *mwmote*. Ova funkcija na slučajan način bira tačku A iz nedominantne kategorije, a potom posmatra njenih *k* najbližih suseda koji imaju istu kategoriju. Od tih suseda se na slučajan način bira tačka B. Nova tačka C, koju će funkcija generisati i dodeliti joj nedominantnu kategoriju, nalazi se između A i B, tj. dobijena je kao njihova konveksna kombinacija: $C = cA+(1−c)B$, za neko $c \in [0,1]$.
